@@ -1,0 +1,7 @@
+database/
+graphs/
+signals/
+.vscode/
+__pycache__/
+options.json
+other/
