@@ -30,6 +30,7 @@ class BotDatabase:
 			interval text,  
 			trade_allocation text, 
 			profit_target text,
+			incremental_stop_loss text,
 			test_run bool
 			)''')
 
@@ -51,6 +52,7 @@ class BotDatabase:
 			time text,
 			price text,
 			take_profit_price text,
+			stop_loss_price text,
 			original_quantity text,
 			executed_quantity text,
 			status text,
@@ -74,7 +76,8 @@ class BotDatabase:
 			interval text, 
 			order_type text, 
 			trade_allocation text, 
-			profit_target text, 
+			profit_target text,
+			incremental_stop_loss text, 
 			test_run bool
 		'''
 		conn = sqlite3.connect(self.name, detect_types=sqlite3.PARSE_DECLTYPES)
@@ -87,8 +90,9 @@ class BotDatabase:
 			bot['interval'], 
 			bot['trade_allocation'],
 			bot['profit_target'],
+			bot['incremental_stop_loss'],
 			bot['test_run'])
-		c.execute('INSERT INTO bots VALUES (?, ?, ?, ?, ?, ?, ?)', values)
+		c.execute('INSERT INTO bots VALUES (?, ?, ?, ?, ?, ?, ?, ?)', values)
 		conn.commit()
 	
 	def GetBot(self, id:str):
@@ -122,6 +126,7 @@ class BotDatabase:
 			'Set ' + \
 			'name = ' + bot['name'] + ', ' + \
 			'profit_target = ' + bot['profit_target'] + ', ' + \
+			'incremental_stop_loss = ' + bot['incremental_stop_loss'] + ', '+ \
 			'Where id = ' + bot['id'])
 		conn.commit()
 
@@ -139,6 +144,7 @@ class BotDatabase:
 			order['time'],
 			order['price'],
 			order['take_profit_price'],
+			order['stop_loss_price'],
 			order['original_quantity'],
 			order['executed_quantity'],
 			order['status'],
@@ -147,7 +153,7 @@ class BotDatabase:
 			order['is_closed'],
 			order['closing_order_id']
 		)
-		c.execute('INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', values)
+		c.execute('INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', values)
 		conn.commit()
 	
 	def GetOrder(self, id:str):
@@ -166,7 +172,8 @@ class BotDatabase:
 		c = conn.cursor()
 
 		values = (
-			order['take_profit_price'], 
+			order['take_profit_price'],
+			order['stop_loss_price'], 
 			order['executed_quantity'],
 			order['status'],
 			order['is_closed'],
@@ -176,6 +183,7 @@ class BotDatabase:
 		c.execute('Update orders ' + \
 			'Set ' + \
 			'take_profit_price = ?, '+ \
+			'stop_loss_price = ?, '+ \
 			'executed_quantity = ?, status = ?, ' + \
 			'is_closed = ?, closing_order_id = ? ' + \
 			'Where id = ?', values)

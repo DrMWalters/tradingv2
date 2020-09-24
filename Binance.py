@@ -49,6 +49,7 @@ class Binance:
 			"exchangeInfo": '/api/v3/exchangeInfo',
 			"24hrTicker" : '/api/v3/ticker/24hr',
 			"averagePrice" : '/api/v3/avgPrice',
+			"currentPrice": '/api/v3/ticker/price',
 			"orderBook" : '/api/v3/depth',
 			"account" : '/api/v3/account'
 		}
@@ -138,6 +139,19 @@ class Binance:
 					symbols_list.append(pair)
 
 		return symbols_list
+
+	def currentPrice(self, symbol:str=""):
+		''' Gets current price of symbol'''
+
+		if( symbol == "" ):
+			AssertionError("currentPrice needs a symbol to check price")
+			
+		url = self.base + self.endpoints["currentPrice"] + "?symbol="+symbol
+		data = self._get(url)
+		if data.__contains__('code'):
+			return []
+
+		return data['price']
 
 	def GetSymbolKlinesExtra(self, symbol:str, interval:str, limit:int=1000, end_time=False):
 		# Basicall, we will be calling the GetSymbolKlines as many times as we need 

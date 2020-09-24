@@ -2,6 +2,8 @@ from uuid import uuid1
 from decimal import Decimal, getcontext
 from yaspin import yaspin
 
+import os
+import shutil
 import json
 import pandas as pd
 import statistics
@@ -100,6 +102,25 @@ def printAverageVolume(df, symbol, currentInterval, options, outputFile):
 	averageVolPerMinAll = float(df['quoteAssetVolume'].mean())/float(options['intervals_InMin'][currentInterval])
 	outputFile.write('"'+symbol[1]+'":\t\t'+str(averageVolPerMinAll)+',\n')
 
+
+def dirChange(path, filename, deleteContentsDir = False):
+
+	if(deleteContentsDir == False):
+		dir = os.path.join(path,filename)
+		if not os.path.exists(dir):
+			os.mkdir(dir)
+
+	else:
+		folder = path+"\\"+filename
+		for filename in os.listdir(folder):
+			file_path = os.path.join(folder, filename)
+			try:
+				if os.path.isfile(file_path) or os.path.islink(file_path):
+					os.unlink(file_path)
+				elif os.path.isdir(file_path):
+					shutil.rmtree(file_path)
+			except Exception as e:
+				print('Failed to delete %s. Reason: %s' % (file_path, e))
 	
 def Main():
 
@@ -114,6 +135,7 @@ def Main():
  
 
 		VARIABLES:
+		"manualTradingFun"		dict	- current function of manualTranding.py
 		"currentIntervals"		list	- current time intervals we are interested in
 		"orderedMinVolumeDict"	dict	- coins and a corresponding minimum average volumn (per minuite)
 										  the ordering is important and any quote assets we want to consider must first be added to this...
@@ -134,6 +156,9 @@ def Main():
 		print("Exception occured when trying to access options.json")
 		print(e)
 
+	#clears the URL dir
+	dirChange(options['currentDir']+"\\signals", "URLs", True)
+
 	sp = yaspin()
 	exchange = Binance(filename = options['credentialLocation'])
 
@@ -152,10 +177,10 @@ def Main():
 	database = BotDatabase(options['database'])
 	prog = BotRunner(sp, exchange, database)
 
-	backTesting = False
-	if(backTesting == True):
+	if(options['manualTradingFun']['backTesting'] != False):
 		symbolsToBeBackTested = []
 		with yaspin() as sp:
+			print("checking interval")
 			currentInterval = "1h"
 			for symbol in orderedSymbols:
 				outputText = ""
@@ -179,32 +204,62 @@ def Main():
 			sp.stop()
 			BacktestStrategies(symbols=symbols, intervals=options["currentIntervals"], plot=True, strategy_evaluators=strategy_evaluators, options = options["btInitialOptions"])
 			sp.start()
+
+	if(options['manualTradingFun']['strategyURLs'] != False):
+		with yaspin() as sp:
+
+			for currentInterval in options['currentIntervals']:
+
+				dirChange(options['currentDir']+"\\signals\\URLs", currentInterval)
+				currentDir = options['currentDir']+"\\signals\\URLs\\"+currentInterval
+
+				for symbol in orderedSymbols:
+
+					currentFileStr = "https://www.binance.com/en/trade/pro/"+symbol[1]+"_"+symbol[2]+"\n\n"
+					sp.text = "Looking for signals on "+symbol[0]+" ("+currentInterval+")"
+					model = TradingModel(symbol[0], currentInterval)
+					df = model.df
+					mVolume = options['orderedMinVolumeDict'][symbol[2]]
+					timeInMins = options['intervals_InMin'][currentInterval]
+
+					if avgMinVolumnCheck(df, 	period = 0,
+												minVolume = mVolume, 
+												timeInMinuites = timeInMins) != False:
+																					
+						if( rsiSignal(df, len(df['close']) - 1 ) == 1):	
+							f=open(currentDir+"\\rsi.txt", "a+")
+							f.write(currentFileStr)
+							f.close()
+
+						# if( macdCrossover(df, len(df['close']) - 1 ) == 1):
+						# 	f=open(currentDir+"\\macd.txt", "a+")
+						# 	f.write(currentFileStr)
+						# 	f.close()
+
+
+						# if( maCrossoverStrategy(df, len(df['close']) - 1 ) != False):
+						# 	f=open(currentDir+"\\maCrossover.txt", "a+")
+						# 	f.write(currentFileStr)
+						# 	f.close()
+
+						# if( float(df['close'].max()) < float(exchange.currentPrice(symbol[0])) ):
+						# 	f=open(currentDir+"\\breakout.txt", "a+")
+						# 	f.write(currentFileStr)
+						# 	f.close()
+
+						
+						# if ( currentInterval == "1d" ):
+						# 	if (avgChgBetweenPeriods(df, 	firstPeriod = 10, 
+						# 									lastPeriod = 1, 
+						# 									minVolume = mVolume,
+						# 									timeInMinuites = timeInMins,
+						# 									minVolPcntChange = 50) != False ):
+						# 		f=open(currentDir+"\\volumnSpike.txt", "a+")
+						# 		f.write(currentFileStr)
+						# 		f.close()
+			
+
 	
-	order_id = str(uuid1())
-	# buy at 0.4% lower than current price
-	# q_qty = Decimal(bot_params['trade_allocation'])
-	# buy_price = exchange.RoundToValidPrice(
-	# 	symbol_data = symbol_data, 
-	# 	desired_price = Decimal(df['close'][i]) * Decimal(1.01))
-	# quantity = exchange.RoundToValidQuantity(
-	# 	symbol_data = symbol_data, 
-	# 	desired_quantity = q_qty / buy_price)
-
-	# desired_price and quantity using only Decimals
-
-	buy_price = 0.0016999
-	quantity = 1.19
-
-	order_params = dict(
-		symbol = "BNBBTC",
-		side = "BUY",
-		type = "LIMIT",
-		timeInForce = "GTC",
-		price = format(buy_price, 'f'),
-		quantity = format(quantity, 'f'),
-		newClientOrderId = order_id)
-
-	prog.PlaceOrder(order_params, False)
 
 
 	

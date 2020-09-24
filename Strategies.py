@@ -3,8 +3,15 @@ from Indicators import Indicators
 # But first, because we're not computing the indicators in TradingModel anymore,
 # if they don't already exist within the df, we will be computing them here
 
-def maCrossoverStrategy(df, i:int, fast:int = 50, slow:int = 200, long:bool = True):
-	''' If price is 10% below the Slow MA, return True'''
+def emaCrossoverStrategy(df, i:int, fast:int = 50, slow:int = 200, long:bool = True):
+	'''
+		 Strategy PASS conditions:
+			If the value of the prevous fast ema < slow ema AND the current value of fast ema > slow ema	
+	
+	'''
+
+	if len(df['close']) < slow:
+		return False
 
 	fastName = str(fast)+"_ema"
 	slowName = str(slow)+"_ema"
@@ -15,6 +22,36 @@ def maCrossoverStrategy(df, i:int, fast:int = 50, slow:int = 200, long:bool = Tr
 
 	if i > 0 and df[fastName][i-1] <= df[slowName][i-1] and \
 		df[fastName][i] > df[slowName][i]:
+		print("############ STRAT IS SUCCESSFUL!! #########")
+		print("\t (i-1) values are: fast = "+str(df[fastName][i-1])+" slow = "+str(df[slowName][i-1]))
+		print("\t (i) values are: fast = "+str(df[fastName][i])+" slow = "+str(df[slowName][i]))
+		print("\t Latest close value was = "+str(df['close'][i]))
+		return df['close'][i] 
+
+	return False
+
+def smaCrossoverStrategy(df, i:int, fast:int = 50, slow:int = 200, long:bool = True):
+	'''
+		 Strategy PASS conditions:
+			If the value of the prevous fast sma < slow sma AND the current value of fast sma > slow sma	
+	
+	'''
+	if len(df['close']) < slow:
+		return False
+
+	fastName = str(fast)+"_sma"
+	slowName = str(slow)+"_sma"
+
+	if not df.__contains__(fastName) and not df.__contains__(slowName):
+		Indicators.AddIndicator(df, indicator_name="sma", col_name=fastName, args=[fast])
+		Indicators.AddIndicator(df, indicator_name="sma", col_name=slowName, args=[slow])
+
+	if i > 0 and df[fastName][i-1] <= df[slowName][i-1] and \
+		df[fastName][i] > df[slowName][i]:
+		print("############ STRAT IS SUCCESSFUL!! #########")
+		print("\t (i-1) values are: fast = "+str(df[fastName][i-1])+" slow = "+str(df[slowName][i-1]))
+		print("\t (i) values are: fast = "+str(df[fastName][i])+" slow = "+str(df[slowName][i]))
+		print("\t Latest close value was = "+str(df['close'][i]))
 		return df['close'][i] 
 
 	return False
@@ -107,7 +144,8 @@ def rsiSignal(df, i:int):
 	return False
 
 strategies_dict = dict(
-	ma_crossover = maCrossoverStrategy,
+	ema_crossover = emaCrossoverStrategy,
+	sma_crossover = smaCrossoverStrategy,
 	ema200_close = nearTwoHunEMAStrategy,
 	ma_simple = maStrategy,
 	bollinger_simple = bollStrategy,

@@ -42,12 +42,13 @@ class BotRunner:
 		# if signal, place buy order
 		if buy is not False:
 			i = len(df) - 1
+			currentPriceOfSymbol = exchange.currentPrice(symbol)
 			order_id = str(uuid1())
 			# buy at 0.4% lower than current price
 			q_qty = Decimal(bot_params['trade_allocation'])
 			buy_price = exchange.RoundToValidPrice(
 				symbol_data = symbol_data, 
-				desired_price = Decimal(df['close'][i]) * Decimal(1.01))
+				desired_price = Decimal(currentPriceOfSymbol) * Decimal(1.0001))
 			quantity = exchange.RoundToValidQuantity(
 				symbol_data = symbol_data, 
 				desired_quantity = q_qty / buy_price)
@@ -120,53 +121,61 @@ class BotRunner:
 		order['executed_quantity'] = Decimal(exchange_order_info['executedQty'])
 		if exchange_order_info['status'] == exchange.ORDER_STATUS_FILLED:
 			if order['is_entry_order']:
-				# place the exit order
-				order_id = str(uuid1())
-				price = exchange.RoundToValidPrice(symbol_data = self.all_symbol_datas[symbol], desired_price = Decimal(order['take_profit_price']))
-				quantity = exchange.RoundToValidQuantity(symbol_data = self.all_symbol_datas[symbol], desired_quantity = Decimal(order['executed_quantity']))
-				order_params = dict(
-					symbol = symbol,
-					side = "SELL",
-					type = "LIMIT",
-					timeInForce = "GTC",
-					price = format(price, 'f'),
-					quantity = format(quantity, 'f'),
-					newClientOrderId = order_id)
 
-				if self.ask_permission:
-					sp.stop()
-					print("Exit found on "+ symbol)
+				currentPriceOfSymbol = exchange.currentPrice(symbol)
 
-					print("Entry Order ")
-					print(exchange_order_info)
-					print()
-					print("Potential Exit Order ")
-					print(order_params)
-					print()
-					print("Place exit order (y / n)?")
-					winsound.PlaySound('other//boxing_bell_multiple.wav', winsound.SND_FILENAME)
-					permission = input()
-				
-					if permission != 'y':	
-						return
+				if( Decimal(currentPriceOfSymbol) >= Decimal(order['take_profit_price']) ):
+					# update the ORDER stop_loss_price
+					new_stop_loss_price = Decimal(currentPriceOfSymbol) * Decimal(bot_params['incremental_stop_loss'])
+					order['stop_loss_price'] = exchange.RoundToValidPrice(symbol_data = self.all_symbol_datas[symbol], desired_price = new_stop_loss_price)
+				elif( Decimal(currentPriceOfSymbol) < Decimal(order['stop_loss_price']) ):
+					# place the exit order
+					order_id = str(uuid1())
+					price = exchange.RoundToValidPrice(symbol_data = self.all_symbol_datas[symbol], desired_price = Decimal(order['stop_loss_price']))
+					quantity = exchange.RoundToValidQuantity(symbol_data = self.all_symbol_datas[symbol], desired_quantity = Decimal(order['executed_quantity']))
+					order_params = dict(
+						symbol = symbol,
+						side = "SELL",
+						type = "LIMIT",
+						timeInForce = "GTC",
+						price = format(price, 'f'),
+						quantity = format(quantity, 'f'),
+						newClientOrderId = order_id)
+
+					if self.ask_permission:
+						sp.stop()
+						print("Exit found on "+ symbol)
+
+						print("Entry Order ")
+						print(exchange_order_info)
+						print()
+						print("Potential Exit Order ")
+						print(order_params)
+						print()
+						print("Place exit order (y / n)?")
+						winsound.PlaySound('other//boxing_bell_multiple.wav', winsound.SND_FILENAME)
+						permission = input()
 					
-				# buy from exchange
-				order_result = self.PlaceOrder(order_params, bot_params['test_run'])
+						if permission != 'y':	
+							return
+						
+					# buy from exchange
+					order_result = self.PlaceOrder(order_params, bot_params['test_run'])
 
-				if order_result is not False:
+					if order_result is not False:
 
-					self.update_balance = True
-					
-					# Save order
-					db_order = self.OrderResultToDatabase(\
-						order_result, None, bot_params, False, False, order['id'])
-					database.SaveOrder(db_order)
+						self.update_balance = True
+						
+						# Save order
+						db_order = self.OrderResultToDatabase(\
+							order_result, self.all_symbol_datas[symbol], bot_params, False, False, order['id'])
+						database.SaveOrder(db_order)
 
-					order['is_closed'] = True
-					order['closing_order_id'] = order_id
-					# Change pair state to inactive
-					pair['is_active'] = False
-					pair['current_order_id'] = order_id
+						order['is_closed'] = True
+						order['closing_order_id'] = order_id
+						# Change pair state to inactive
+						pair['is_active'] = False
+						pair['current_order_id'] = order_id
 			else:
 				self.update_balance = True
 				sp.stop()
@@ -248,6 +257,9 @@ class BotRunner:
 			symbol_data = symbol_data,
 			desired_price = Decimal(order_result['price']) * Decimal(bot_params['profit_target']), 
 			round_up=True)
+		order['stop_loss_price'] = exchange.RoundToValidPrice(
+			symbol_data = symbol_data,
+			desired_price = Decimal(order_result['price']) * Decimal(bot_params['incremental_stop_loss']))
 		order['original_quantity'] =  Decimal(order_result['origQty'])
 		order['executed_quantity'] =  Decimal(order_result['executedQty'])
 		order['status'] = order_result['status']
@@ -268,7 +280,8 @@ class BotRunner:
 					strategy_name='ma_crossover', 
 					interval='3m',
 					trade_allocation=0.1, 
-					profit_target=1.012, 
+					profit_target=1.012,
+					incremental_stop_loss=0.995, 
 					test=False, 
 					symbols=[]):
 
@@ -279,6 +292,7 @@ class BotRunner:
 		assert interval in exchange.KLINE_INTERVALS, interval+" is not a valid interval."
 		assert trade_allocation > 0 and trade_allocation <= 1, "Trade allocation should be in (0, 1]"
 		assert profit_target > 0, "Profit target should be above 0"
+		assert incremental_stop_loss > 0 and incremental_stop_loss < 1, "incremental_stop_loss should be above 0 and below 1"
 
 		symbol_datas = exchange.GetSymbolDataOfSymbols(symbols)
 		symbol_datas_dict = dict()
@@ -293,6 +307,7 @@ class BotRunner:
 			interval = interval,
 			trade_allocation = Decimal(trade_allocation), 
 			profit_target = Decimal(profit_target),
+			incremental_stop_loss = Decimal(incremental_stop_loss),
 			test_run = test
 		)
 		database.SaveBot(bot_params)
@@ -542,10 +557,11 @@ def Main():
 				bot, symbol_datas_dict = prog.CreateBot(
 					name="BNB_maCrossOver_Bot",
 					interval=currentInterval,
-					strategy_name='ma_crossover',
-					trade_allocation=0.1,
-					profit_target=1.02,
-					test=True, 
+					strategy_name='sma_crossover',
+					trade_allocation=0.11,
+					profit_target=1.025,
+					incremental_stop_loss=0.995,
+					test=False, 
 					symbols=marketSymbols)
 				bot_symbol_datas.append((bot, symbol_datas_dict))
 
