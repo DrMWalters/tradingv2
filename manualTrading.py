@@ -226,15 +226,15 @@ def Main():
 												minVolume = mVolume, 
 												timeInMinuites = timeInMins) != False:
 																					
-						if( rsiSignal(df, len(df['close']) - 1 ) == 1):	
+						if( rsiSignalOverSold(df, len(df['close']) - 1, 2) != False):	
 							f=open(currentDir+"\\rsi.txt", "a+")
 							f.write(currentFileStr)
 							f.close()
 
-						# if( macdCrossover(df, len(df['close']) - 1 ) == 1):
-						# 	f=open(currentDir+"\\macd.txt", "a+")
-						# 	f.write(currentFileStr)
-						# 	f.close()
+						if( macdCrossoverBull(df, len(df['close']) - 1 , 2) != False):
+							f=open(currentDir+"\\macd.txt", "a+")
+							f.write(currentFileStr)
+							f.close()
 
 
 						# if( maCrossoverStrategy(df, len(df['close']) - 1 ) != False):

@@ -15,6 +15,9 @@ from pyti.relative_strength_index import relative_strength_index as rsi
 # it contains 4 indicators: tenkan sen, kijun sen, senkou span a and senkou span b...
 # I won't go in detail about what each of them means, but they are useful in certain strategies
 
+def macdSLine(data, period):
+	return ema(data, period)
+
 def ComputeIchimokuCloud(df):
 	''' Taken from the python for finance blog '''
 
@@ -54,6 +57,7 @@ class Indicators:
 	INDICATORS_DICT = {
 		"sma": sma,
 		"ema": ema,
+		"macdSLine": macdSLine,
 		"lbb": lbb,
 		"ubb": ubb,
 		"macd": macd,
@@ -74,7 +78,12 @@ class Indicators:
 			else:
 				# remember here how we used to compute the other indicators inside 
 				# TradingModel: self.df['fast_sma'] = sma(self.df['close'].tolist(), 10)
-				df[col_name] = Indicators.INDICATORS_DICT[indicator_name](df['close'].tolist(), *args)
+
+				# This is the Signal line for the MACD indicator (historam is df['macd'][i] - df['macdSLine'][i])
+				if indicator_name == "macdSLine":
+					df[col_name] = Indicators.INDICATORS_DICT[indicator_name](df['macd'].tolist(), *args)
+				else:
+					df[col_name] = Indicators.INDICATORS_DICT[indicator_name](df['close'].tolist(), *args)
 		except Exception as e:
 			print("\nException raised when trying to compute "+indicator_name)
 			print(e)

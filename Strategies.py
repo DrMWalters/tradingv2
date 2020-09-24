@@ -111,35 +111,35 @@ def ichimokuBullish(df, i:int):
 	
 	return False
 
-def macdCrossover(df, i:int):
+def macdCrossoverBull(df, i:int, tol:int=0):
 
-	if not df.__contains__('macd'):
+	maxLengthNeeded = 26
+	if (len(df['close']) < maxLengthNeeded ):
+		return False
+
+	if not df.__contains__('macd') and not df.__contains__('macdSignal'):
 		Indicators.AddIndicator(df,indicator_name="macd", col_name="macd", args=[12 , 26])
+		Indicators.AddIndicator(df,indicator_name="macdSLine", col_name="macdSLine", args=[9])
 
-	if i > 0:
-
-		# sell signal
-		if (df['macd'][i] <= 0 and df['macd'][i-1] >= 0):
-			return -1
-
-		# buy signal
-		if (df['macd'][i] >= 0 and df['macd'][i-1] <= 0):
-			return 1
+	for ii in range(i, i-tol if i>tol else 0, -1):
+		if ii > 0 and ( (df['macd'][ii] - df['macdSLine'][ii]) >= 0 and \
+			(df['macd'][ii-1] - df['macdSLine'][ii-1]) <= 0):
+			return df['close'][ii]
 
 	return False
 
-def rsiSignal(df, i:int):
+def rsiSignalOverSold(df, i:int, tol:int=0):
+
+	maxLengthNeeded = 14
+	if (len(df['close']) < maxLengthNeeded ):
+		return False
 
 	if not df.__contains__('rsi'):
 		Indicators.AddIndicator(df, indicator_name='rsi',col_name='rsi', args=[14])
 
-	if i > 0:
-
-		if df['rsi'][i] >= 70:
-			return -1
-		
-		if df['rsi'][i] <= 30:
-			return 1
+	for ii in range(i, i-tol if i>tol else 0, -1):
+		if ii > 0 and df['rsi'][ii] <= 30:
+			return df['close'][ii]
 		
 	return False
 
